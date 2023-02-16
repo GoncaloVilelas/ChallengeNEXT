@@ -9,9 +9,10 @@ public final class App {
 
     // A text dataset is pointed to by path.
     // The path can be either a single text file or a directory of text files
-    private String path = "sourcecode/src/utils/coutryCodes.txt";
+    private String path = "src/utils/coutryCodes.txt";
     private SparkSession spark = SparkSession
         .builder()
+        .master("local")
         .appName("NEXT Challenge")
         .getOrCreate();
     private Dataset<Row> df1 = spark.read().text(path);
