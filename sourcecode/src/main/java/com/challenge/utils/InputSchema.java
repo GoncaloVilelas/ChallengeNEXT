@@ -3,19 +3,18 @@ package utils;
 import org.apache.spark.sql.types.StructType;
 
 /** 123 .**/
-public final class TxtSchema {
+public final class InputSchema {
 
     private static StructType schema;
 
-    private TxtSchema() {
+    private InputSchema() {
 
     }
 
     /** 123 .*/
     public static StructType getSchema() {
         schema = new StructType()
-        .add("Country code", "string")
-        .add("Phone number", "int");
+        .add("PhoneNumber", "string");
         return schema;
     }
 
