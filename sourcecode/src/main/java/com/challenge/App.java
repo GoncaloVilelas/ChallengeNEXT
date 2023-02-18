@@ -106,19 +106,26 @@ public final class App {
     public Dataset<Row> addShortNumbers(final Dataset<Row> finalShortDf,
         final Dataset<Row> finalDf) {
 
-        return finalDf.withColumn("count",
+        Dataset<Row> sumDf = finalDf.withColumn("count",
             when(col("Country").equalTo("Portugal"),
             finalDf.col("count").plus(finalShortDf.count()))
             .otherwise(finalDf.col("count")));
+
+        return sumDf.sort(col("count").desc(), col("Country").desc());
     }
 
-    /** */
+    /**
+     * You have to be very careful when using Spark coalesce()
+     * and repartition() methods on larger datasets as they are
+     * expensive operations and could throw OutOfMemory errors.
+     * @param dfToWrite ff
+    */
     public void writeDfOnTxt(final Dataset<Row> dfToWrite) {
-        dfToWrite.write().format("csv")
+        dfToWrite.coalesce(1).write()
+            .format("com.databricks.spark.csv")
             .option("header", false)
             .option("delimiter", ":")
-            .option("compression", "gzip")
-            .save("src/main/java/com/challenge/results");
+            .save("src/main/java/com/challenge/results.csv");
     }
 
     /**
