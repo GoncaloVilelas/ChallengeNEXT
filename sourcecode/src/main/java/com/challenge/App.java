@@ -8,8 +8,9 @@ import utils.CountryCodesSchema;
 import utils.InputSchema;
 
 import static org.apache.spark.sql.functions.col;
-import static org.apache.spark.sql.functions.lpad;
 import static org.apache.spark.sql.functions.regexp_replace;
+import static org.apache.spark.sql.functions.trim;
+import static org.apache.spark.sql.functions.when;
 
 /** */
 public final class App {
@@ -52,15 +53,6 @@ public final class App {
                 .load(pathInputFile);
     }
 
-    /** */
-    public void paddCountryCodes() {
-        Dataset<Row> df = dfCountryCodes.withColumn("Code",
-            lpad(col("Code"), PADDING_COUNTRY_CODE, "0")
-        );
-
-        df.show();
-    }
-
     /**
      *  @throws Exception ee
      *  @return tempDf
@@ -83,18 +75,50 @@ public final class App {
     public Dataset<Row> filterLongNumbers()
         throws Exception {
         Dataset<Row> tempDf = spark.sql("SELECT * from tempView where "
-            + "rlike(PhoneNumber,'^[0-9]*$') OR PhoneNumber LIKE '+%'");
+            + "PhoneNumber NOT LIKE '+ %' AND PhoneNumber NOT LIKE '00 %' AND "
+            + "(rlike(PhoneNumber,'^[0-9]*$') OR PhoneNumber LIKE '+%')");
 
         Dataset<Row> tempDf1 = tempDf.withColumn("PhoneNumber",
-            regexp_replace(col("PhoneNumber"), "[^A-Z0-9_]", ""));
+            regexp_replace(trim(col("PhoneNumber")), " ", ""));
 
-        tempDf1.createOrReplaceTempView("tempViewLong2");
-        tempDf1 = spark.sql("SELECT PhoneNumber FROM tempViewLong2"
-        + " WHERE LENGTH(PhoneNumber) >= " + MIN_LONG_DIGITS + " AND"
-        + " LENGTH(PhoneNumber) <= " + MAX_LONG_DIGITS);
-        tempDf1.show();
+        Dataset<Row> tempDf2 = tempDf1.withColumn("PhoneNumber",
+            regexp_replace(trim(col("PhoneNumber")), "^(\\+|00)", ""));
 
-        return tempDf1;
+        tempDf2.createOrReplaceTempView("tempViewLong2");
+        tempDf2 = spark.sql("SELECT PhoneNumber FROM tempViewLong2"
+            + " WHERE LENGTH(PhoneNumber) >= " + MIN_LONG_DIGITS + " AND"
+            + " LENGTH(PhoneNumber) <= " + MAX_LONG_DIGITS);
+
+        Dataset<Row> tempDf3 = tempDf2.join(dfCountryCodes,
+            tempDf2.col("PhoneNumber").startsWith(dfCountryCodes.col("Code")),
+            "inner");
+
+        Dataset<Row> finalDf = tempDf3.groupBy("Country").count();
+        return finalDf;
+    }
+
+    /**
+     *
+     * @param finalShortDf ggg
+     * @param finalDf fff
+     * @return finalCount
+     */
+    public Dataset<Row> addShortNumbers(final Dataset<Row> finalShortDf,
+        final Dataset<Row> finalDf) {
+
+        return finalDf.withColumn("count",
+            when(col("Country").equalTo("Portugal"),
+            finalDf.col("count").plus(finalShortDf.count()))
+            .otherwise(finalDf.col("count")));
+    }
+
+    /** */
+    public void writeDfOnTxt(final Dataset<Row> dfToWrite) {
+        dfToWrite.write().format("csv")
+            .option("header", false)
+            .option("delimiter", ":")
+            .option("compression", "gzip")
+            .save("src/main/java/com/challenge/results");
     }
 
     /**
@@ -105,8 +129,12 @@ public final class App {
      */
     public static void main(final String[] args) throws Exception {
         App appTest = new App(args[0]);
-        appTest.paddCountryCodes();
-        appTest.filterShortNumbers();
-        appTest.filterLongNumbers();
+
+        Dataset<Row> shortNumbersDf = appTest.filterShortNumbers();
+        Dataset<Row> finalDf = appTest.filterLongNumbers();
+        Dataset<Row> finalCountDf = appTest
+            .addShortNumbers(shortNumbersDf, finalDf);
+
+        appTest.writeDfOnTxt(finalCountDf);
     }
 }
