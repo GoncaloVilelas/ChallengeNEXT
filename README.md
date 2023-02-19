@@ -51,4 +51,4 @@ $ java -jar .\target\sourcecode-1.0.0-jar-with-dependencies.jar <PATH-TO-INPUT-F
 ```
 Before running the app, be sure that the folder "results.csv" is deleted inside src/main/java/com/challenge!
 ## Testing
-TODO: Additional instructions for testing the application.
+I have made unit tests for each method on App class. The tests run before building the fat JAR.
