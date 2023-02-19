@@ -22,15 +22,17 @@ public final class App {
     private static final int MAX_LONG_DIGITS = 14;
     private static final int PADDING_COUNTRY_CODE = 4;
 
-    // A text dataset is pointed to by path.
-    // The path can be either a single text file or a directory of text files
-    private String pathCountryCodes = "src/main/java/com/challenge/utils/coutryCodes.txt";
+    private String pathCountryCodes =
+        "src/main/java/com/challenge/utils/coutryCodes.txt";
     private SparkSession spark;
     private Dataset<Row> dfCountryCodes;
     private StructType countryCodeSchema;
     private StructType inputSchema;
 
-    /** */
+    /**
+     * @param pathInputFile - path to the input file
+     * provided as argument when executing JAR
+    */
     private App(final String pathInputFile) {
         countryCodeSchema = CountryCodesSchema.getSchema();
         inputSchema = InputSchema.getSchema();
@@ -54,8 +56,8 @@ public final class App {
     }
 
     /**
-     *  @throws Exception ee
-     *  @return tempDf
+     *  @throws Exception catches any exception thrown
+     *  @return dataset with only valid short numbers
     */
     public Dataset<Row> filterShortNumbers() throws Exception {
         dfInput.createOrReplaceTempView("tempView");
@@ -69,8 +71,8 @@ public final class App {
     }
 
     /**
-     *  @throws Exception ee
-     *  @return tempDf
+     *  @throws Exception catches any exception thrown
+     *  @return dataset with only valid long numbers
     */
     public Dataset<Row> filterLongNumbers()
         throws Exception {
@@ -89,19 +91,28 @@ public final class App {
             + " WHERE LENGTH(PhoneNumber) >= " + MIN_LONG_DIGITS + " AND"
             + " LENGTH(PhoneNumber) <= " + MAX_LONG_DIGITS);
 
-        Dataset<Row> tempDf3 = tempDf2.join(dfCountryCodes,
-            tempDf2.col("PhoneNumber").startsWith(dfCountryCodes.col("Code")),
-            "inner");
-
-        Dataset<Row> finalDf = tempDf3.groupBy("Country").count();
-        return finalDf;
+        return tempDf2;
     }
 
     /**
      *
-     * @param finalShortDf ggg
-     * @param finalDf fff
-     * @return finalCount
+     * @param finalLongDf - final dataframe with only long numbers
+     * @return final dataframe with long numbers and respective country codes
+     */
+    public Dataset<Row> joinBothDataframes(final Dataset<Row> finalLongDf) {
+        Dataset<Row> tempDf3 = finalLongDf.join(dfCountryCodes,
+            finalLongDf.col("PhoneNumber").startsWith(
+            dfCountryCodes.col("Code")), "inner");
+
+        return tempDf3.groupBy("Country").count();
+    }
+
+    /**
+     *
+     * @param finalShortDf - final dataframe with only short numbers
+     * @param finalDf - final dataframe with long numbers and
+     * respective country codes
+     * @return final dataframe with count of short and long numbers
      */
     public Dataset<Row> addShortNumbers(final Dataset<Row> finalShortDf,
         final Dataset<Row> finalDf) {
@@ -118,7 +129,8 @@ public final class App {
      * You have to be very careful when using Spark coalesce()
      * and repartition() methods on larger datasets as they are
      * expensive operations and could throw OutOfMemory errors.
-     * @param dfToWrite ff
+     * @param dfToWrite - final dataframe that is going to be written
+     * in a csv file
     */
     public void writeDfOnTxt(final Dataset<Row> dfToWrite) {
         dfToWrite.coalesce(1).write()
@@ -129,18 +141,18 @@ public final class App {
     }
 
     /**
-     * Says hello to the world.
-
+     *
      * @param args The arguments of the program.
-     * @throws Exception ee
+     * @throws Exception catches any exception thrown
      */
     public static void main(final String[] args) throws Exception {
         App appTest = new App(args[0]);
 
         Dataset<Row> shortNumbersDf = appTest.filterShortNumbers();
         Dataset<Row> finalDf = appTest.filterLongNumbers();
+        Dataset<Row> finalJoinedDf = appTest.joinBothDataframes(finalDf);
         Dataset<Row> finalCountDf = appTest
-            .addShortNumbers(shortNumbersDf, finalDf);
+            .addShortNumbers(shortNumbersDf, finalJoinedDf);
 
         appTest.writeDfOnTxt(finalCountDf);
     }
