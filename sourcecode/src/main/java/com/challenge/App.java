@@ -33,7 +33,7 @@ public final class App {
      * @param pathInputFile - path to the input file
      * provided as argument when executing JAR
     */
-    private App(final String pathInputFile) {
+    public App(final String pathInputFile) {
         countryCodeSchema = CountryCodesSchema.getSchema();
         inputSchema = InputSchema.getSchema();
         spark = SparkSession
